@@ -1,0 +1,208 @@
+
+version: "3.5"
+
+x-environment:
+  &default-environment
+#### Uncomment and configure the following if you are behind a proxy
+  #- JAVA_HTTP_PROXY=-Dhttp.proxyHost=xxx.xxx.xxx.xx -Dhttp.proxyPort=xxxx
+  #- JAVA_HTTPS_PROXY=-Dhttps.proxyHost=xxx.xxx.xxx.xx -Dhttps.proxyPort=xxxx
+  #- JAVA_NON_PROXY_HOSTS=-Dhttp.nonProxyHosts=*xxx.xxx.xxx.xx|symbiote-cloudconfig|symbiote-aam
+  # - JAVA_SOCKS_PROXY = -Dhttps.proxyHost=xxx.xxx.xxx.xx -Dhttps.proxyPort=xxxx
+  #- _JAVA_OPTIONS= -Dhttps.proxyHost=xxx.xxx.xxx.xx -Dhttps.proxyPort=xxxx  $JAVA_NON_PROXY_HOSTS -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:MaxRAMFraction=1
+  - TZ=Europe/Athens
+services:
+  symbiote-rabbitmq:
+    environment: *default-environment
+    image: rabbitmq:3-alpine
+    networks:
+      - symbioteL2
+    ports:
+      - 5671:5671
+      - 5672:5672
+  symbiote-mongo:
+    image: mongo:3.6
+    networks:
+      - symbioteL2
+    volumes:
+      - symbiote-vol:/data/db
+  symbiote-cloudconfig:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-cloudconfig:3.0.4
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+      - symbioteL2
+    ports:
+      - 8888:8888
+    volumes:
+      - symbiote-vol-config:/home/CloudConfigProperties
+  symbiote-aam:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-aam:5.0.12
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+      - symbioteL2
+    ports:
+      - 8080:8080
+    secrets:
+      - source: aambootstrapconfig
+        target: /home/bootstrap.properties
+      - source: aamcertconfig
+        target: /home/cert.properties
+  symbiote-eureka:
+    image: symbioteh2020/symbiote-eureka:3.0.2
+    networks:
+      - symbioteL2
+    secrets:
+      - source: eurekabootstrapconfig
+        target: /home/bootstrap.properties
+  symbiote-rap:
+    environment: *default-environment
+    #image: symbioteh2020/symbiote-rap:3.0.5
+    image: shapes2020/symbiote-rap-3.0
+    depends_on:
+      - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+    networks:
+      - symbioteL2
+    secrets:
+      - source: rapbootstrapconfig
+        target: /home/bootstrap.properties
+  symbiote-rh:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-rh:3.0.8
+    depends_on:
+      - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+      - symbioteL2
+    ports:
+      - 8001:8001
+    secrets:
+      - source: rhbootstrapconfig
+        target: /home/bootstrap.properties
+  symbiote-monitoring:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-monitoring:3.0.4
+    depends_on:
+      - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+      - symbioteL2
+    secrets:
+      - source: monitorbootstrapconfig
+        target: /home/bootstrap.properties
+  symbiote-pr:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-pr:3.0.4
+    depends_on:
+    - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+    networks:
+    - symbioteL2
+    secrets:
+    - source: prbootstrapconfig
+      target: /home/bootstrap.properties
+  symbiote-fm:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-fm:3.0.3
+    depends_on:
+    - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+    - symbioteL2
+    secrets:
+    - source: fmbootstrapconfig
+      target: /home/bootstrap.properties
+  symbiote-sm:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-sm:3.0.3
+    depends_on:
+    - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+    - symbioteL2
+    secrets:
+    - source: smbootstrapconfig
+      target: /home/bootstrap.properties
+  symbiote-tm:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-tm:3.0.4
+    depends_on:
+    - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+    - symbioteL2
+    secrets:
+    - source: tmbootstrapconfig
+      target: /home/bootstrap.properties
+  symbiote-bt:
+    environment: *default-environment
+    image: symbioteh2020/symbiote-bt:3.0.5
+    depends_on:
+    - symbiote-aam
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    networks:
+    - symbioteL2
+    secrets:
+    - source: btbootstrapconfig
+      target: /home/bootstrap.properties
+
+networks:
+  symbioteL2:
+    name: symbioteL2
+volumes:
+  symbiote-vol:
+  symbiote-vol-config:
+secrets:
+  eurekabootstrapconfig:
+    file: ./Eureka/bootstrap.properties
+  aambootstrapconfig:
+    file: ./AuthenticationAuthorizationManager/bootstrap.properties
+  aamcertconfig:
+    file: ./AuthenticationAuthorizationManager/cert.properties
+  rapbootstrapconfig:
+    file: ./ResourceAccessProxy/bootstrap.properties
+  rhbootstrapconfig:
+    file: ./RegistrationHandler/bootstrap.properties
+  monitorbootstrapconfig:
+    file: ./Monitoring/bootstrap.properties
+  prbootstrapconfig:
+    file: ./PlatformRegistry/bootstrap.properties
+  fmbootstrapconfig:
+    file: ./FederationManager/bootstrap.properties
+  smbootstrapconfig:
+    file: ./SubscriptionManager/bootstrap.properties
+  tmbootstrapconfig:
+    file: ./TrustManager/bootstrap.properties
+  btbootstrapconfig:
+    file: ./BarteringAndTrading/bootstrap.properties
